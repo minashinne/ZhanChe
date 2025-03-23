@@ -7,22 +7,15 @@
 // #include "PinDefinitionsAndMore.h"
 #include <IRremote.hpp>
 
-#include "Wire.h"
-
-#define I2C_DEV_ADDR 0x18
-
 #define IR_RECEIVE_PIN 14
 
 #define ESPNOW_WIFI_CHANNEL 6
-
-#define LED_PIN 23
-#define NUM_LEDS 3
-
+//LED矩阵配置
+#define LED_PIN 15
+#define NUM_LEDS 48
+#define INTERVAL 200  // LED 切换时间间隔 (ms)
+//蜂鸣器配置
 #define BUZZER_PIN 26
-
-#define TASK1_STACK_SIZE 1000
-
-TaskHandle_t Task1;
 
 bool IR_FLAG = 0;
 
@@ -43,59 +36,62 @@ typedef struct struct_message {
 
 // 初始化 WS2812 灯带对象
 Adafruit_NeoPixel strip(NUM_LEDS, LED_PIN, NEO_GRB + NEO_KHZ800);
-
+//初始化红外接收对象
 uint64_t myRawdata;
+//初始化ESPNWO接收结构体
 struct_message myData;
 String cmd;
 
-// void task1(void *pvParameters) {
-//   struct_message *_myData = (struct_message *)pvParameters;
-//   while (1) {
-//     if (_myData->rxmessage == "Hit!") {
-//       // 控制 WS2812 灯带变化
-//       for (int i = 0; i < NUM_LEDS; i++) {
-//         strip.setPixelColor(i, strip.Color(255, 0, 0));  // 设置为红色
-//       }
-//       strip.show();
-//       // 控制蜂鸣器响声
-//       tone(BUZZER_PIN, 1000);  // 设置频率为 1000Hz
-//       delay(500);
 
-//       // 关闭 WS2812 灯带
-//       for (int i = 0; i < NUM_LEDS; i++) {
-//         strip.setPixelColor(i, strip.Color(0, 0, 0));  // 关闭灯光
-//       }
-//       strip.show();
-//       noTone(BUZZER_PIN);  // 停止蜂鸣器
-//       delay(500);
-//     }
-//     Serial.println("Task 1 is running");
-//     delay(500);  // 让出CPU时间
-//   }
-// }
-
-void hit() {
-  if (strcmp(myData.rxmessage, "Hit!") == 0) {
-    // 清空收到的数据
-    memset(&myData.rxmessage, 0, sizeof(myData.txmessage));
-    // 控制 WS2812 灯带变化
-    for (int i = 0; i < NUM_LEDS; i++) {
-      strip.setPixelColor(i, strip.Color(255, 0, 0));  // 设置为红色
+//收到对方ESP32发来的命中信息后对LED矩阵进行控制
+//LED播放动画线程
+unsigned long previousMillis = 0;
+int step = 0;           // 状态机步骤
+bool ledActive = true;  // 仅在收到 "Hit!" 时激活 LED
+void ledTask(void *pvParameters) {
+  while (1) {
+    if (strcmp(myData.rxmessage, "Hit!") == 0) {
+      ledActive = true;
+      memset(myData.rxmessage, 0, sizeof(myData.rxmessage));  // 清空消息
+      step = 0;                                               // 重新开始 LED 序列
     }
-    strip.show();
-    // // 控制蜂鸣器响声
-    // tone(BUZZER_PIN, 1000);  // 设置频率为 1000Hz
-    // delay(500);
 
-    // 关闭 WS2812 灯带
-    for (int i = 0; i < NUM_LEDS; i++) {
-      strip.setPixelColor(i, strip.Color(0, 0, 0));  // 关闭灯光
+    if (ledActive) {
+      unsigned long currentMillis = millis();
+
+      if (currentMillis - previousMillis >= INTERVAL) {
+        previousMillis = currentMillis;  // 更新时间
+
+        switch (step) {
+          case 0:
+            Led_1(strip.Color(255, 255, 255));  // 第一圈亮白色
+            break;
+          case 1:
+            Led_2(strip.Color(255, 255, 255));  // 第二圈亮白色
+            break;
+          case 2:
+            Led_3(strip.Color(255, 255, 255));  // 第三圈亮白色
+            break;
+          case 3:
+            Led_1(strip.Color(0, 0, 0));  // 第一圈熄灭
+            break;
+          case 4:
+            Led_2(strip.Color(0, 0, 0));  // 第二圈熄灭
+            break;
+          case 5:
+            Led_3(strip.Color(0, 0, 0));  // 第三圈熄灭
+            ledActive = false;            // 结束 LED 序列
+            break;
+        }
+
+        step++;
+      }
     }
-    strip.show();
-    // noTone(BUZZER_PIN);  // 停止蜂鸣器
-    // delay(500);
+
+    vTaskDelay(pdMS_TO_TICKS(10));  // 避免任务占用过多 CPU 资源
   }
 }
+
 // 接收到消息时的回调函数
 void onDataReceived(const esp_now_recv_info_t *info, const uint8_t *incomingData, int len) {
   // 复制收到的数据
@@ -108,10 +104,6 @@ void onDataReceived(const esp_now_recv_info_t *info, const uint8_t *incomingData
 
 // 发送结果回调函数，发送完成后移除当前注册设备
 void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
-  //发送结果打印
-  // Serial.print("Last Packet Send Status: ");
-  // Serial.println(status == ESP_NOW_SEND_SUCCESS ? "Success" : "Fail");
-
   // 发送完成后移除当前设备，并添加下一个设备
   esp_now_del_peer(peerAddress);  // 移除当前设备
   // Serial.println("Removed current peer.");
@@ -130,27 +122,6 @@ void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   //   Serial.println("Added new peer.");
   // }
 }
-
-//IIC命令解析
-void docmd(String cmdl) {
-  //MAC
-  if (cmdl != "" && cmdl.substring(0, 3) == "MAC") {
-    Serial1.println(cmdl);
-    cmd = "";
-    //射击
-  } else if (cmdl == "SHOOT") {
-    //收到命令后开始接收红外信号0.5S
-    unsigned long currentMillis = millis();
-    IR();
-    EspSend(myData);
-    cmd = "";
-    //其他
-  } else if (cmdl != "") {
-    Serial1.println("clear");
-    cmd = "";
-  }
-}
-
 
 //红外接收并配置接收到的ESP MAC以准备进行发送
 void IR() {
@@ -180,6 +151,105 @@ void IR() {
     }
   }
 }
+
+
+//LED矩阵控制
+//预设WS2812下标（6x8）
+uint8_t Led_Frame1[8]{ 14, 15, 20, 21, 26, 27, 32, 33 };
+uint8_t Led_Frame2[16]{ 7, 8, 9, 10, 13, 16, 19, 22, 25, 28, 31, 34, 37, 38, 39, 40 };
+uint8_t Led_Frame3[24]{ 0, 1, 2, 3, 4, 5, 6, 11, 12, 17, 18, 23, 24, 29, 30, 35, 36, 41, 42, 43, 44, 45, 46, 47 };
+//第一圈控制，依照HSV颜色值
+void Led_1(uint32_t color) {
+  for (int i = 0; i < 8; i++) {
+    strip.setPixelColor(Led_Frame1[i], color);
+  }
+  strip.show();
+}
+
+
+//第二圈控制
+void Led_2(uint32_t color) {
+  for (int i = 0; i < 16; i++) {
+    strip.setPixelColor(Led_Frame2[i], color);
+  }
+  strip.show();
+}
+
+
+//第三圈控制
+void Led_3(uint32_t color) {
+  for (int i = 0; i < 24; i++) {
+    strip.setPixelColor(Led_Frame3[i], color);
+  }
+  strip.show();
+}
+
+
+//红外接收任务
+void IRReceiveTask(void *pvParameters) {
+  unsigned long startMillis = millis();
+
+  while (millis() - startMillis < 500) {  // 0.5s 内检测红外信号
+    IR();
+    vTaskDelay(pdMS_TO_TICKS(10));  // 避免占用太多 CPU
+  }
+
+  EspSend(myData);    // 发送数据
+  vTaskDelete(NULL);  // 任务结束并删除自身
+}
+
+
+//串口命令接收
+void docmd(String cmdl) {
+  cmdl.trim();  // 去除首尾空格
+  if (cmdl == "MAC") {
+    getMac();  // 发送 MAC 地址
+  } else if (cmdl == "SHOOT") {
+    xTaskCreate(IRReceiveTask, "IRTask", 2048, NULL, 2, NULL);  // 启动独立任务
+  } else if (cmdl.length() > 0) {
+    Serial.println("Unknown Command");  // 未知命令反馈
+  }
+}
+
+//获取MAC地址转长整数
+// void getMac() {
+//   uint8_t mac[6];
+//   uint64_t macint = 0;
+//   WiFi.macAddress(mac);
+//   for (int i = 0; i < 6; i++) {
+//     macint |= (uint64_t(mac[i]) << (8 * (5 - i)));  // 位移并合并
+//   }
+//   Serial.println(macint, HEX);
+// }
+
+
+//获取MAC转字符串
+void getMac() {
+  uint8_t mac[6];
+  WiFi.macAddress(mac);
+  Serial.printf("MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", mac[0], mac[1], mac[2], mac[3], mac[4], mac[5]);
+}
+
+//EspNow发送
+void EspSend(struct_message _myData) {
+  // // 打印结果
+  Serial.print("Parsed MAC Address: ");
+  for (int i = 0; i < 6; i++) {
+    Serial.print(peerAddress[i]);
+    if (i < 5) Serial.print(":");
+  }
+  Serial.println();
+  // 发送消息
+  esp_err_t result = esp_now_send(peerAddress, (uint8_t *)&_myData.txmessage, sizeof(_myData.txmessage));  //从节点树中找到对应MAC的节点进行信息发送
+  if (result == ESP_OK) {
+    Serial.println("Message sent successfully");
+  } else {
+    Serial.println("Message failed to send");
+  }
+}
+
+
+//初始化配置
 void setup() {
   // 初始化 WS2812 灯带
   strip.begin();
@@ -187,10 +257,7 @@ void setup() {
 
   // 初始化蜂鸣器引脚
   pinMode(BUZZER_PIN, OUTPUT);
-  //初始化IIC
-  Wire.begin(I2C_DEV_ADDR);
-  Wire.onReceive(receiveEvent);
-  Wire.setClock(100000);
+  //初始化串口
   Serial.begin(115200);
   //WIFI设置为STA
   WiFi.mode(WIFI_STA);
@@ -219,61 +286,23 @@ void setup() {
   // 填充发送的数据
   strcpy(myData.txmessage, "Hit!");
 
-  //   xTaskCreate(task1,        // 任务函数
-  //               "Task with Struct",  // 任务名称
-  //               2000,                // 堆栈大小
-  //               (void *)&myData,  // 传递的参数（结构体指针）
-  //               1,                   // 优先级
-  //               &Task1);             // 任务句柄
+  // 创建ESPNOW信息监听及LED 控制任务
+  xTaskCreatePinnedToCore(
+    ledTask,     // 任务函数
+    "LED Task",  // 任务名称
+    1000,        // 栈大小
+    NULL,        // 任务参数
+    3,           // 任务优先级
+    NULL,        // 任务句柄
+    0            // 绑定 CPU 核心 0
+  );
 }
 
+
+//主任务
 void loop() {
-  hit();
-  docmd(cmd);
-  IR();
-  // //espnow配置结构
-  // esp_now_peer_info_t peerInfo;
-  // memset(&peerInfo, 0, sizeof(peerInfo));  //清空结构体，不然会有意料外的垃圾数据
-  // memcpy(peerInfo.peer_addr, peerAddress1, 6);
-  // peerInfo.channel = 6;      // 默认频道
-  // peerInfo.encrypt = false;  // 不加密
-  // esp_now_add_peer(&peerInfo);
-  // esp_now_send(peerAddress1, (uint8_t *)&myData.txmessage, sizeof(myData.txmessage));
-}
-
-
-
-//IIC中断处理
-void receiveEvent(int howMany) {
-  while (0 < Wire.available())  // loop through all but the last
-  {
-    cmd += (char)Wire.read();  // receive byte as a character
-  }
-}
-//MAC地址
-void getMac() {
-  uint8_t mac[6];
-  uint64_t macint = 0;
-  WiFi.macAddress(mac);
-  for (int i = 0; i < 6; i++) {
-    macint |= (uint64_t(mac[i]) << (8 * (5 - i)));  // 位移并合并
-  }
-  Serial.println(macint, HEX);
-}
-//EspNow发送
-void EspSend(struct_message _myData) {
-  // // 打印结果
-  // Serial.print("Parsed MAC Address: ");
-  // for (int i = 0; i < 6; i++) {
-  //   Serial.print(peerAddress[i]);
-  //   if (i < 5) Serial.print(":");
-  // }
-  // Serial.println();
-  // 发送消息
-  esp_err_t result = esp_now_send(peerAddress, (uint8_t *)&_myData.txmessage, sizeof(_myData.txmessage));  //从节点树中找到对应MAC的节点进行信息发送
-  if (result == ESP_OK) {
-    Serial.println("Message sent successfully");
-  } else {
-    Serial.println("Message failed to send");
+  if (Serial.available()) {
+    cmd = Serial.readStringUntil('\n');  // 读取串口命令
+    docmd(cmd);                          // 解析并执行命令
   }
 }
