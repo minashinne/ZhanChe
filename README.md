@@ -82,23 +82,23 @@ as5600库需要进行部分修改，其中burnAngle（）函数由于操作不�
 
 IRnec处新增长数据类型定义
 
-![image (2)](./assets/image (2).png)
+![image (2)](./assets/image2.png)
 
 此处增加发送位数及修改aRawData的数据类型为64位整数。
 
-![image (3)](./assets/image (3).png)
+![image (3)](./assets/image3.png)
 
 此处增加对48位脉冲（48*2+4）的验证
 
-![image (4)](C:\BaiduSyncdisk\0_项目分类\zhanche_test_code\assets\image (4).png)
+![image (4)](./assets/image4.png)
 
 此处同步增加解码的数据位数为48。
 
-![image (5)](./assets/image (5).png)
+![image (5)](./assets/image5.png)
 
 修改头文件中预定义的aRawData的数据类型为64位整数。
 
-![image (6)](./assets/image (6).png)
+![image (6)](./assets/image6.png)
 
 **Adafruit_NeoPixel**
 
