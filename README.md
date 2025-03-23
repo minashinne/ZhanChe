@@ -46,33 +46,63 @@ STM32F103RCT6/STM32F105RCT6
 
 ### **3.1 编译选项**
 
-​	编译选择blue button F103RCT，optimize选择faster（-O2，debug时选择debug以便报错输出，USB support必须关闭为CAN让出IO口，此板子的模块设置了使用外部晶振并9倍频为72Mhz（Generic 板子的晶振设置为内部晶振8/2*16=64Mhz，未修改编译文件会导致许多频率敏感的库不可使用,故不可使用Generic配置）。同时设置了默认的串口为PA10,PA9故不用再定义串口。
+​	编译选择blue button F103RCT，optimize选择faster（-O2，debug时选择debug以便报错输出，USB support必须关闭为CAN让出IO口，此板子的模块设置了使用外部晶振并9倍频为72Mhz（Generic 板子的晶振设置为内部晶振8/2*16=64Mhz，使用Generic设置需要修改时钟配置文件，未修改配置文件会导致许多频率敏感的库不可使用,故不使用Generic配置）。同时设置了默认的串口为PA10,PA9故不用再定义串口。
 
 ### **3.2 库文件**
 
-1. **QuickPID**
+**QuickPID**
 
-   [Dlloydev/QuickPID: A fast PID controller with multiple options. Various Integral anti-windup, Proportional, Derivative and timer control modes.](https://github.com/Dlloydev/QuickPID)
+[Dlloydev/QuickPID: A fast PID controller with multiple options. Various Integral anti-windup, Proportional, Derivative and timer control modes.](https://github.com/Dlloydev/QuickPID)
 
-2. **eXoCAN**
+**eXoCAN**
 
-   [exothink/eXoCAN： stm32duino CAN Library for the STM32F103 aka Blue Pill](https://github.com/exothink/eXoCAN)
+[exothink/eXoCAN： stm32duino CAN Library for the STM32F103 aka Blue Pill](https://github.com/exothink/eXoCAN)
 
-3. **AccelStepper**
+**AccelStepper**
 
-   [AccelStepper: AccelStepper library for Arduino](https://www.airspayce.com/mikem/arduino/AccelStepper/)
+[AccelStepper: AccelStepper library for Arduino](https://www.airspayce.com/mikem/arduino/AccelStepper/)
 
-4. **AS5600**
+**AS5600**
 
-   [RobTillaart/AS5600: Arduino library for AS5600 magnetic rotation meter](https://github.com/RobTillaart/AS5600)
-   
-   as5600库需要进行部分修改，其中burnAngle（）函数由于操作不安全默认注释，需要取消注释。
-   
-   ![image-20250318101839364](./assets/image-20250318101839364.png)
-   
-   
-   
-   ![image-20250318101846906](./assets/image-20250318101846906.png)
+[RobTillaart/AS5600: Arduino library for AS5600 magnetic rotation meter](https://github.com/RobTillaart/AS5600)
+
+as5600库需要进行部分修改，其中burnAngle（）函数由于操作不安全默认注释，需要取消注释。
+
+![image-20250318101839364](./assets/image-20250318101839364.png)
+
+
+
+![image-20250318101846906](./assets/image-20250318101846906.png)
+
+**IRremote**
+
+[Arduino-IRremote/Arduino-IRremote: Infrared remote library for Arduino: send and receive infrared signals with multiple protocols](https://github.com/Arduino-IRremote/Arduino-IRremote)
+
+此库文件进行了修改以便于发送48位MAC地址、
+
+IRnec处新增长数据类型定义
+
+![image (2)](./assets/image (2).png)
+
+此处增加发送位数及修改aRawData的数据类型为64位整数。
+
+![image (3)](./assets/image (3).png)
+
+此处增加对48位脉冲（48*2+4）的验证
+
+![image (4)](C:\BaiduSyncdisk\0_项目分类\zhanche_test_code\assets\image (4).png)
+
+此处同步增加解码的数据位数为48。
+
+![image (5)](./assets/image (5).png)
+
+修改头文件中预定义的aRawData的数据类型为64位整数。
+
+![image (6)](./assets/image (6).png)
+
+**Adafruit_NeoPixel**
+
+[adafruit/Adafruit_NeoPixel：Arduino 控制单线 LED 像素（NeoPixel、WS2812 等）的库 --- adafruit/Adafruit_NeoPixel: Arduino library for controlling single-wire LED pixels (NeoPixel, WS2812, etc.)](https://github.com/adafruit/Adafruit_NeoPixel)
 
 ## **4. BxCAN数据帧格式**
 
