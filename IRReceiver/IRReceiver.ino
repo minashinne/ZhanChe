@@ -46,8 +46,8 @@ String cmd;
 //收到对方ESP32发来的命中信息后对LED矩阵进行控制
 //LED播放动画线程
 unsigned long previousMillis = 0;
-int step = 0;           // 状态机步骤
-bool ledActive = true;  // 仅在收到 "Hit!" 时激活 LED
+int step = 0;            // 状态机步骤
+bool ledActive = false;  // 仅在收到 "Hit!" 时激活 LED
 void ledTask(void *pvParameters) {
   while (1) {
     if (strcmp(myData.rxmessage, "Hit!") == 0) {
@@ -146,8 +146,8 @@ void IR() {
       peerInfo.channel = 6;                        // 默认频道
       peerInfo.encrypt = false;                    // 不加密
       esp_now_add_peer(&peerInfo);                 //注册节点树
-      Serial.println(myRawdata, HEX);
-      Serial.println();
+      // Serial.println(myRawdata, HEX);
+      // Serial.println();
     }
   }
 }
@@ -232,19 +232,14 @@ void getMac() {
 
 //EspNow发送
 void EspSend(struct_message _myData) {
-  // // 打印结果
-  Serial.print("Parsed MAC Address: ");
-  for (int i = 0; i < 6; i++) {
-    Serial.print(peerAddress[i]);
-    if (i < 5) Serial.print(":");
-  }
-  Serial.println();
+  //打印结果
+  Serial.printf("MAC: %02X:%02X:%02X:%02X:%02X:%02X\n", peerAddress[0], peerAddress[1], peerAddress[2], peerAddress[3], peerAddress[4], peerAddress[5]);
   // 发送消息
   esp_err_t result = esp_now_send(peerAddress, (uint8_t *)&_myData.txmessage, sizeof(_myData.txmessage));  //从节点树中找到对应MAC的节点进行信息发送
   if (result == ESP_OK) {
-    Serial.println("Message sent successfully");
+    Serial.println("sent successfully");
   } else {
-    Serial.println("Message failed to send");
+    Serial.println("sent failed");
   }
 }
 
