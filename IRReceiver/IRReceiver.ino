@@ -120,7 +120,7 @@ void onDataReceived(const esp_now_recv_info_t *info, const uint8_t *incomingData
 void onDataSent(const uint8_t *mac_addr, esp_now_send_status_t status) {
   // 发送完成后移除当前设备，并添加下一个设备
   esp_now_del_peer(peerAddress);  // 移除当前设备
-  memset(peerAddress, 0, 6);     //清空缓存数组
+  memset(peerAddress, 0, 6);      //清空缓存数组
 }
 
 //红外接收并配置接收到的ESP MAC以准备进行发送
@@ -158,7 +158,7 @@ void IR() {
 uint8_t Led_Frame1[8]{ 14, 15, 20, 21, 26, 27, 32, 33 };
 uint8_t Led_Frame2[16]{ 7, 8, 9, 10, 13, 16, 19, 22, 25, 28, 31, 34, 37, 38, 39, 40 };
 uint8_t Led_Frame3[24]{ 0, 1, 2, 3, 4, 5, 6, 11, 12, 17, 18, 23, 24, 29, 30, 35, 36, 41, 42, 43, 44, 45, 46, 47 };
-//第一圈控制，依照HSV颜色值
+//第一圈控制，依照RGB颜色值
 void Led_1(uint32_t color) {
   for (int i = 0; i < 8; i++) {
     strip_l.setPixelColor(Led_Frame1[i], color);
