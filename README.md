@@ -479,12 +479,12 @@ int txDataLen = 8;
 void Send_Data() {
   if (MAC != 0) {
     txData[0] = 'M';                 //正常代码M
-    txData[1] = MAC & 0xFF;          // 获取最低字节
-    txData[2] = (MAC >> 8) & 0xFF;   // 获取9-16字节
-    txData[3] = (MAC >> 16) & 0xFF;  // 获取17-24字节
-    txData[4] = (MAC >> 24) & 0xFF;  // 获取25-32字节
-    txData[5] = (MAC >> 32) & 0xFF;  // 获取33-40字节
-    txData[6] = (MAC >> 40) & 0xFF;  // 获取41-48字节
+    txData[6] = MAC & 0xFF;          // 获取最低字节
+    txData[5] = (MAC >> 8) & 0xFF;   // 获取9-16字节
+    txData[4] = (MAC >> 16) & 0xFF;  // 获取17-24字节
+    txData[3] = (MAC >> 24) & 0xFF;  // 获取25-32字节
+    txData[2] = (MAC >> 32) & 0xFF;  // 获取33-40字节
+    txData[1] = (MAC >> 40) & 0xFF;  // 获取41-48字节
     can.transmit(txMsgID, txData, txDataLen);
   }
 }
@@ -505,7 +505,7 @@ void canISR()                  // 依照setup中的过滤器配置来接收CAN�
   // Serial.println(id);
   switch (rxData[0]) {
     case 'M':                                                                                                                          //更新MAC地址
-      MAC = (uint64_t)((rxData[6] << 40) | (rxData[5] << 32) | (rxData[4] << 24) | (rxData[3] << 16) | (rxData[2] << 8) | rxData[1]);  //将接受数据转为64位整数MAC值
+      MAC = (uint64_t)(rxData[1] << 40) | (uint64_t)(rxData[2] << 32) | (uint64_t)(rxData[3] << 24) | (uint64_t)(rxData[4] << 16) | (uint64_t)(rxData[5] << 8) | (uint64_t)rxData[6];  //将接受数据转为64位整数MAC值
       break;
     case 'R':  //回报当前MAC
       Send_Data_Flag = true;
