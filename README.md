@@ -460,10 +460,67 @@ void Closed_Loop() {
 ### 4.10 ESP32红外接收、ESPNOW收发、LED矩阵控制说明
 
 1. 通过串口命令“MAC”可以让esp32返回自身的MAC地址
-2. 通过串口命令"SHOOT",可以让esp32 接收红外信号0.5秒并发送"Hit!"消息到所接受到的MAC地址所在的esp32处。（非阻塞）返回消息发送状态及目标MAC地址
+2. 通过串口命令"SHOOT",可以让esp32 接收红外信号0.5秒并发送"Hit!"消息到所接受到的MAC地址所在的esp32处。（非阻塞）返回消息发送状态及目标MAC地址，未收到消息返回0:0:0:0:0:0MAC及发送失败的消息。
 3. ESP32监听ESPNOW消息，如收到“Hit!”，控制LED矩阵播放受击动画（非阻塞）。动画效果如下所示，自内而外依次亮起并熄灭。
+4. 使用 "COLOR RRGGBB"格式消息来控制背部LED颜色。如 COLOR FF0000
 
 ![image-20250323185309497](./assets/image-20250323185309497.png)
+
+![image-20250324104941177](./assets/image-20250324104941177-1742784584796-1.png)
+
+### 4.11 STM32红外发送TxData
+
+**’M‘+48位整数MAC**
+
+```c++
+//上报当前缓存的MAC
+uint8_t txData[8]{};  //整数转化后的数组容器,第0位为状态代码，第1,2位为目标角度，第3,4位为当前角度。
+int txDataLen = 8;
+void Send_Data() {
+  if (MAC != 0) {
+    txData[0] = 'M';                 //正常代码M
+    txData[1] = MAC & 0xFF;          // 获取最低字节
+    txData[2] = (MAC >> 8) & 0xFF;   // 获取9-16字节
+    txData[3] = (MAC >> 16) & 0xFF;  // 获取17-24字节
+    txData[4] = (MAC >> 24) & 0xFF;  // 获取25-32字节
+    txData[5] = (MAC >> 32) & 0xFF;  // 获取33-40字节
+    txData[6] = (MAC >> 40) & 0xFF;  // 获取41-48字节
+    can.transmit(txMsgID, txData, txDataLen);
+  }
+}
+```
+
+### 4.12 STM32红外发送RxData
+
+```c++
+//设置CAN接收回调
+int id, fltIdx = 0;
+uint64_t MAC = 0;
+bool Run_Flag = false;
+bool Send_Data_Flag = false;
+volatile uint8_t rxData[8]{};  // 声明一个 8 字节数组来接收数据
+void canISR()                  // 依照setup中的过滤器配置来接收CAN消息
+{
+  can.receive(id, fltIdx, rxData);  // 从CAN总线接收数据（接收到的ID，成功匹配消息的过滤器的索引，接收到的数据）
+  // Serial.println(id);
+  switch (rxData[0]) {
+    case 'M':                                                                                                                          //更新MAC地址
+      MAC = (uint64_t)((rxData[6] << 40) | (rxData[5] << 32) | (rxData[4] << 24) | (rxData[3] << 16) | (rxData[2] << 8) | rxData[1]);  //将接受数据转为64位整数MAC值
+      break;
+    case 'R':  //回报当前MAC
+      Send_Data_Flag = true;
+      break;
+    case 'I':  //开始发送红外信号
+      Run_Flag = true;
+      break;
+    case 'T':  //停止发送红外信号
+      Run_Flag = false;
+      break;
+  }
+}
+```
+
+
 
 ## **5. 串口控制示例代码**
 
@@ -475,13 +532,25 @@ void Closed_Loop() {
 
 控制：
 
-**ID 114 S 2000**
+**ID 114 S 2000 速度提升到2000**
 
-**ID 119 A 400（-400）**
+**ID 119 A 400（-400）移动到40度处**
 
-**ID 119 Z**
+**ID 119 Z 零位归零**
 
-**ID 114 R**
+**ID 114 R 电机解锁**
+
+**ID 117 I 红外发送启动**
+
+**ID 117 T 红外发送停止**
+
+**ID 117 M 31463894820116 发送48位整数MAC地址（即1C9DC2462514，1C:9D:C2:46:25:14）**为和上述指令统一格式，此处MAC也使用整数格式发送，需要将6位uint8地址移位合并为48位整数，如：
+
+```c++
+MAC = (uint64_t)(rxData[1] << 40) | (uint64_t)(rxData[2] << 32) | (uint64_t)(rxData[3] << 24) | (uint64_t)(rxData[4] << 16) | (uint64_t)(rxData[5] << 8) | (uint64_t)rxData[6];
+```
+
+**CAN HOST 源代码：**
 
 ```c++
 //导入exoCAN
@@ -544,6 +613,7 @@ void Uart_Send() {
 }
 
 //CAN消息预设
+//四驱控制
 void Run(int txMsgID, int16_t Target_Speed) {
   uint8_t txData[3]{};
   int txDataLen = 3;
@@ -552,12 +622,28 @@ void Run(int txMsgID, int16_t Target_Speed) {
   txData[2] = (Target_Speed >> 8) & 0xFF;  // 获取最高字节
   can.transmit(txMsgID, txData, txDataLen);
 }
+//R指令
 void Cmd_R(int txMsgID) {
   uint8_t txData[1]{};
   int txDataLen = 1;
   txData[0] = 'R';  //复位代码R(recover)
   can.transmit(txMsgID, txData, txDataLen);
 }
+//I指令
+void Cmd_I(int txMsgID) {
+  uint8_t txData[1]{};
+  int txDataLen = 1;
+  txData[0] = 'I';  //红外发射代码I(IR)
+  can.transmit(txMsgID, txData, txDataLen);
+}
+//T指令
+void Cmd_T(int txMsgID) {
+  uint8_t txData[1]{};
+  int txDataLen = 1;
+  txData[0] = 'T';  //停止红外发射代码T(STOP)为与S区分
+  can.transmit(txMsgID, txData, txDataLen);
+}
+//角度控制命令
 void Angle(int txMsgID, int16_t Target_Angle_10) {
   uint8_t txData[3]{};
   int txDataLen = 3;
@@ -566,26 +652,44 @@ void Angle(int txMsgID, int16_t Target_Angle_10) {
   txData[2] = (Target_Angle_10 >> 8) & 0xFF;  // 获取最高字节
   can.transmit(txMsgID, txData, txDataLen);
 }
+//数据回报命令（通用，不止角度）
 void Read_Angle(int txMsgID) {
   uint8_t txData[1]{};
   int txDataLen = 1;
   txData[0] = 'R';  //读取代码R(read)
   can.transmit(txMsgID, txData, txDataLen);
 }
+//零位归零命令
 void Set_ZPos(int txMsgID) {
   uint8_t txData[1]{};
   int txDataLen = 1;
   txData[0] = 'Z';  //归零代码Z(Zero)
   can.transmit(txMsgID, txData, txDataLen);
 }
-
+//MAC地址发送命令
+void Send_Mac(int txMsgID, uint64_t MAC) {
+  uint8_t txData[7]{};
+  int txDataLen = 7;
+  if (MAC != 0) {
+    txData[0] = 'M';                 //正常代码M
+    txData[1] = MAC & 0xFF;          // 获取最低字节
+    txData[2] = (MAC >> 8) & 0xFF;   // 获取9-16字节
+    txData[3] = (MAC >> 16) & 0xFF;  // 获取17-24字节
+    txData[4] = (MAC >> 24) & 0xFF;  // 获取25-32字节
+    txData[5] = (MAC >> 32) & 0xFF;  // 获取33-40字节
+    txData[6] = (MAC >> 40) & 0xFF;  // 获取41-48字节
+    can.transmit(txMsgID, txData, txDataLen);
+  }
+}
+//串口转CAN指令
 void Uart_To_Can() {
   if (Serial.available()) {
     String command = Serial.readStringUntil('\n');  // 读取一整行命令
     command.trim();                                 // 去除首尾空格
     Serial.println("Received: " + command);         // 打印接收到的指令
 
-    int id, value;
+    int id;
+    uint64_t value;
     char cmd;
 
     // 解析串口指令格式: "ID 111 S 1000"
@@ -597,11 +701,13 @@ void Uart_To_Can() {
       if (cmd == 'S') {
         Serial.print("Parsed Speed: ");
         Serial.println(value);
-        Run(id, value);  // 发送速度命令
+        Run(id, (int16_t)value);  // 发送速度命令
       } else if (cmd == 'A') {
         Serial.print("Parsed Angle: ");
         Serial.println(value);
-        Angle(id, value);  // 发送角度命令
+        Angle(id, (int16_t)value);  // 发送角度命令
+      } else if (cmd == 'M') {
+        Send_Mac(id, value);  //发送MAC地址
       } else {
         Serial.println("⚠ 未知指令");
       }
@@ -616,6 +722,10 @@ void Uart_To_Can() {
         Cmd_R(id);  // 复位命令或角度读取命令
       } else if (cmd == 'Z') {
         Set_ZPos(id);  // 归零命令
+      } else if (cmd == 'I') {
+        Cmd_I(id);  //红外发射命令
+      } else if (cmd == 'T') {
+        Cmd_T(id);  //红外停发命令
       } else {
         Serial.println("⚠ 未知指令");
       }
