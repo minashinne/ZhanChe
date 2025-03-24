@@ -47,7 +47,7 @@ void Uart_Send() {
     if (i == 6 || i == 7) {
       if (rxData_2[i].updated) {
         char buffer[50];
-        sprintf(buffer, "ID:%d %c %PRIu64", i + 111, rxData_2[i].data[0], (uint64_t)(rxData_2[i].data[6] << 40) | (uint64_t)(rxData_2[i].data[5] << 32) | (uint64_t)(rxData_2[i].data[4] << 24) | (uint64_t)(rxData_2[i].data[3] << 16) | (uint64_t)(rxData_2[i].data[2] << 8) | (uint64_t)rxData_2[i].data[1]);
+        sprintf(buffer, "ID:%d %c %PRIu64", i + 111, rxData_2[i].data[0], (uint64_t)(rxData_2[i].data[1] << 40) | (uint64_t)(rxData_2[i].data[2] << 32) | (uint64_t)(rxData_2[i].data[3] << 24) | (uint64_t)(rxData_2[i].data[4] << 16) | (uint64_t)(rxData_2[i].data[5] << 8) | (uint64_t)rxData_2[i].data[6]);
         Serial.println(buffer);
         Serial.println();
         rxData_2[i].updated = false;  // 处理完成后清除标志
@@ -124,12 +124,12 @@ void Send_Mac(int txMsgID, uint64_t MAC) {
   int txDataLen = 7;
   if (MAC != 0) {
     txData[0] = 'M';                 //正常代码M
-    txData[1] = MAC & 0xFF;          // 获取最低字节
-    txData[2] = (MAC >> 8) & 0xFF;   // 获取9-16字节
-    txData[3] = (MAC >> 16) & 0xFF;  // 获取17-24字节
-    txData[4] = (MAC >> 24) & 0xFF;  // 获取25-32字节
-    txData[5] = (MAC >> 32) & 0xFF;  // 获取33-40字节
-    txData[6] = (MAC >> 40) & 0xFF;  // 获取41-48字节
+    txData[6] = MAC & 0xFF;          // 获取最低字节
+    txData[5] = (MAC >> 8) & 0xFF;   // 获取9-16字节
+    txData[4] = (MAC >> 16) & 0xFF;  // 获取17-24字节
+    txData[3] = (MAC >> 24) & 0xFF;  // 获取25-32字节
+    txData[2] = (MAC >> 32) & 0xFF;  // 获取33-40字节
+    txData[1] = (MAC >> 40) & 0xFF;  // 获取41-48字节
     can.transmit(txMsgID, txData, txDataLen);
   }
 }
