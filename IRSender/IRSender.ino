@@ -24,8 +24,8 @@ void canISR()                  // 依照setup中的过滤器配置来接收CAN�
   can.receive(id, fltIdx, rxData);  // 从CAN总线接收数据（接收到的ID，成功匹配消息的过滤器的索引，接收到的数据）
   // Serial.println(id);
   switch (rxData[0]) {
-    case 'M':                                                                                                                          //更新MAC地址
-      MAC = (uint64_t)((rxData[6] << 40) | (rxData[5] << 32) | (rxData[4] << 24) | (rxData[3] << 16) | (rxData[2] << 8) | rxData[1]);  //将接受数据转为64位整数MAC值
+    case 'M':                                                                                                                                                                          //更新MAC地址
+      MAC = (uint64_t)(rxData[6] << 40) | (uint64_t)(rxData[5] << 32) | (uint64_t)(rxData[4] << 24) | (uint64_t)(rxData[3] << 16) | (uint64_t)(rxData[2] << 8) | (uint64_t)rxData[1];  //将接受数据转为64位整数MAC值
       break;
     case 'R':  //回报当前MAC
       Send_Data_Flag = true;

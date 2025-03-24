@@ -45,14 +45,21 @@ void Uart_Send() {
   }
   for (int i = 4; i < 10; i++) {
     if (i == 6 || i == 7) {
-      continue;
-    }
-    if (rxData_2[i].updated) {
-      char buffer[20];
-      sprintf(buffer, "ID:%d %c %d %d %d", i + 111, rxData_2[i].data[0], (int16_t)(rxData_2[i].data[2] << 8 | rxData_2[i].data[1]), (int16_t)(rxData_2[i].data[4] << 8 | rxData_2[i].data[3]), rxData_2[i].data[5]);
-      Serial.println(buffer);
-      Serial.println();
-      rxData_2[i].updated = false;  // 处理完成后清除标志
+      if (rxData_2[i].updated) {
+        char buffer[50];
+        sprintf(buffer, "ID:%d %c %PRIu64", i + 111, rxData_2[i].data[0], (uint64_t)(rxData_2[i].data[6] << 40) | (uint64_t)(rxData_2[i].data[5] << 32) | (uint64_t)(rxData_2[i].data[4] << 24) | (uint64_t)(rxData_2[i].data[3] << 16) | (uint64_t)(rxData_2[i].data[2] << 8) | (uint64_t)rxData_2[i].data[1]);
+        Serial.println(buffer);
+        Serial.println();
+        rxData_2[i].updated = false;  // 处理完成后清除标志
+      }
+    } else {
+      if (rxData_2[i].updated) {
+        char buffer[20];
+        sprintf(buffer, "ID:%d %c %d %d %d", i + 111, rxData_2[i].data[0], (int16_t)(rxData_2[i].data[2] << 8 | rxData_2[i].data[1]), (int16_t)(rxData_2[i].data[4] << 8 | rxData_2[i].data[3]), rxData_2[i].data[5]);
+        Serial.println(buffer);
+        Serial.println();
+        rxData_2[i].updated = false;  // 处理完成后清除标志
+      }
     }
   }
 }
@@ -138,7 +145,7 @@ void Uart_To_Can() {
     char cmd;
 
     // 解析串口指令格式: "ID 111 S 1000"
-    if (sscanf(command.c_str(), "ID %d %c %d", &id, &cmd, &value) > 2) {
+    if (sscanf(command.c_str(), "ID %d %c %PRIu64", &id, &cmd, &value) > 2) {
       Serial.print("Parsed ID: ");
       Serial.println(id);
       Serial.print("Parsed CMD: ");
