@@ -58,6 +58,7 @@ void Uart_Send() {
 }
 
 //CAN消息预设
+//四驱控制
 void Run(int txMsgID, int16_t Target_Speed) {
   uint8_t txData[3]{};
   int txDataLen = 3;
@@ -66,12 +67,28 @@ void Run(int txMsgID, int16_t Target_Speed) {
   txData[2] = (Target_Speed >> 8) & 0xFF;  // 获取最高字节
   can.transmit(txMsgID, txData, txDataLen);
 }
+//R指令
 void Cmd_R(int txMsgID) {
   uint8_t txData[1]{};
   int txDataLen = 1;
   txData[0] = 'R';  //复位代码R(recover)
   can.transmit(txMsgID, txData, txDataLen);
 }
+//I指令
+void Cmd_I(int txMsgID) {
+  uint8_t txData[1]{};
+  int txDataLen = 1;
+  txData[0] = 'I';  //红外发射代码I(IR)
+  can.transmit(txMsgID, txData, txDataLen);
+}
+//T指令
+void Cmd_T(int txMsgID) {
+  uint8_t txData[1]{};
+  int txDataLen = 1;
+  txData[0] = 'T';  //停止红外发射代码T(STOP)为与S区分
+  can.transmit(txMsgID, txData, txDataLen);
+}
+//角度控制命令
 void Angle(int txMsgID, int16_t Target_Angle_10) {
   uint8_t txData[3]{};
   int txDataLen = 3;
@@ -80,17 +97,34 @@ void Angle(int txMsgID, int16_t Target_Angle_10) {
   txData[2] = (Target_Angle_10 >> 8) & 0xFF;  // 获取最高字节
   can.transmit(txMsgID, txData, txDataLen);
 }
+//数据回报命令（通用，不止角度）
 void Read_Angle(int txMsgID) {
   uint8_t txData[1]{};
   int txDataLen = 1;
   txData[0] = 'R';  //读取代码R(read)
   can.transmit(txMsgID, txData, txDataLen);
 }
+//零位归零命令
 void Set_ZPos(int txMsgID) {
   uint8_t txData[1]{};
   int txDataLen = 1;
   txData[0] = 'Z';  //归零代码Z(Zero)
   can.transmit(txMsgID, txData, txDataLen);
+}
+//MAC地址发送命令
+void Send_Mac(int txMsgID, uint64_t MAC) {
+  uint8_t txData[7]{};
+  int txDataLen = 7;
+  if (MAC != 0) {
+    txData[0] = 'M';                 //正常代码M
+    txData[1] = MAC & 0xFF;          // 获取最低字节
+    txData[2] = (MAC >> 8) & 0xFF;   // 获取9-16字节
+    txData[3] = (MAC >> 16) & 0xFF;  // 获取17-24字节
+    txData[4] = (MAC >> 24) & 0xFF;  // 获取25-32字节
+    txData[5] = (MAC >> 32) & 0xFF;  // 获取33-40字节
+    txData[6] = (MAC >> 40) & 0xFF;  // 获取41-48字节
+    can.transmit(txMsgID, txData, txDataLen);
+  }
 }
 //串口转CAN指令
 void Uart_To_Can() {
@@ -99,7 +133,8 @@ void Uart_To_Can() {
     command.trim();                                 // 去除首尾空格
     Serial.println("Received: " + command);         // 打印接收到的指令
 
-    int id, value;
+    int id;
+    uint64_t value;
     char cmd;
 
     // 解析串口指令格式: "ID 111 S 1000"
@@ -111,11 +146,13 @@ void Uart_To_Can() {
       if (cmd == 'S') {
         Serial.print("Parsed Speed: ");
         Serial.println(value);
-        Run(id, value);  // 发送速度命令
+        Run(id, (int16_t)value);  // 发送速度命令
       } else if (cmd == 'A') {
         Serial.print("Parsed Angle: ");
         Serial.println(value);
-        Angle(id, value);  // 发送角度命令
+        Angle(id, (int16_t)value);  // 发送角度命令
+      } else if (cmd == 'M') {
+        Send_Mac(id, value);  //发送MAC地址
       } else {
         Serial.println("⚠ 未知指令");
       }
@@ -130,6 +167,10 @@ void Uart_To_Can() {
         Cmd_R(id);  // 复位命令或角度读取命令
       } else if (cmd == 'Z') {
         Set_ZPos(id);  // 归零命令
+      } else if (cmd == 'I') {
+        Cmd_I(id);  //红外发射命令
+      } else if (cmd == 'T') {
+        Cmd_T(id);  //红外停发命令
       } else {
         Serial.println("⚠ 未知指令");
       }

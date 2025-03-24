@@ -1,30 +1,82 @@
 #include <Arduino.h>
+//导入红外接收库
+#include <IRremote.hpp>
 
-#if !defined(ARDUINO_ESP32C3_DEV)  // This is due to a bug in RISC-V compiler, which requires unused function sections :-(.
-#define DISABLE_CODE_FOR_RECEIVER  // Disables static receiver code like receive timer ISR handler and static IRReceiver and irparams data. Saves 450 bytes program memory and 269 bytes RAM if receiving functions are not required.
-#endif
-// #define SEND_PWM_BY_TIMER         // Disable carrier PWM generation in software and use (restricted) hardware PWM.
-// #define USE_NO_SEND_PWM           // Use no carrier PWM, just simulate an active low receiver signal. Overrides SEND_PWM_BY_TIMER definition
+//导入exoCAN
+#include <eXoCAN.h>
+#define IR_SEND_PIN PB15
+#define IR_SEND_PIN_STRING "PB15"
 
-#include <IRremote.hpp>  // include the library
+//CAN设置
+int txMsgID = 117;  //发送报文附带的ID
+int rxMsgID = 117;  //准许接收指定附带ID的报文（过滤器控制，未进入loop模式，不会接收自己的报文）
+eXoCAN can(STD_ID_LEN, BR250K, PORTA_11_12_XCVR);
 
-#define IR_SEND_PIN             PB15
-#define IR_SEND_PIN_STRING      "PB15"
-//ir nec开头修改数据长度并添加到IRsend::sendNECRaw中，同时修改IRsend::sendNECRaw的数据长度为uint64，并同步修改irremote中的预定义处的类型。
+
+//设置CAN接收回调
+int id, fltIdx = 0;
+uint64_t MAC = 0;
+bool Run_Flag = false;
+bool Send_Data_Flag = false;
+volatile uint8_t rxData[8]{};  // 声明一个 8 字节数组来接收数据
+void canISR()                  // 依照setup中的过滤器配置来接收CAN消息
+{
+  can.receive(id, fltIdx, rxData);  // 从CAN总线接收数据（接收到的ID，成功匹配消息的过滤器的索引，接收到的数据）
+  // Serial.println(id);
+  switch (rxData[0]) {
+    case 'M':                                                                                                                          //更新MAC地址
+      MAC = (uint64_t)((rxData[6] << 40) | (rxData[5] << 32) | (rxData[4] << 24) | (rxData[3] << 16) | (rxData[2] << 8) | rxData[1]);  //将接受数据转为64位整数MAC值
+      break;
+    case 'R':  //回报当前MAC
+      Send_Data_Flag = true;
+      break;
+    case 'I':  //开始发送红外信号
+      Run_Flag = true;
+      break;
+    case 'T':  //停止发送红外信号
+      Run_Flag = false;
+      break;
+  }
+}
+
+unsigned long lastTime = 0;  // 上次计算时间
+//上报当前缓存的MAC
+uint8_t txData[8]{};  //整数转化后的数组容器,第0位为状态代码，第1,2位为目标角度，第3,4位为当前角度。
+int txDataLen = 8;
+void Send_Data() {
+  if (MAC != 0) {
+    txData[0] = 'M';                 //正常代码M
+    txData[1] = MAC & 0xFF;          // 获取最低字节
+    txData[2] = (MAC >> 8) & 0xFF;   // 获取9-16字节
+    txData[3] = (MAC >> 16) & 0xFF;  // 获取17-24字节
+    txData[4] = (MAC >> 24) & 0xFF;  // 获取25-32字节
+    txData[5] = (MAC >> 32) & 0xFF;  // 获取33-40字节
+    txData[6] = (MAC >> 40) & 0xFF;  // 获取41-48字节
+    can.transmit(txMsgID, txData, txDataLen);
+  }
+}
 
 String cmd;
 void setup() {
 
   Serial.begin(115200);
-  IrSender.begin(IR_SEND_PIN);      // Start with IR_SEND_PIN -which is defined in PinDefinitionsAndMore.h- as send pin and enable feedback LED at default feedback LED pin
-  disableLEDFeedback();  // Disable feedback LED at default feedback LED pin
-  delay(1000);
+  IrSender.begin(IR_SEND_PIN);  // Start with IR_SEND_PIN -which is defined in PinDefinitionsAndMore.h- as send pin and enable feedback LED at default feedback LED pin
+  disableLEDFeedback();         // Disable feedback LED at default feedback LED pin
+  delay(100);
 }
 
-uint64_t MAC = 0;
+
 void loop() {
-  IrSender.sendNECRaw(0x1C9DC245BB3C, 0);
-  delay(100);  // delay must be greater than 5 ms (RECORD_GAP_MICROS), otherwise the receiver sees it as one long signal
+  unsigned long currentTime = millis();
+  //得到红外发送指令后每100ms发送一次红外编码的MAC地址（NEC协议每bit发送占时2.25ms，48比特占时108ms 起始脉冲13.5ms，总花费121.5ms，为保证信息不混淆，间隔为发送所需时间+等待时间）
+  if (Run_Flag) {
+    if (currentTime - lastTime >= 200) {
+      IrSender.sendNECRaw(MAC, 0);  //发送MAC，重复次数0
+      lastTime = currentTime;       // 更新计算时间
+    }
+  }
+  //得到发送指令后发送当前所得MAC地址
+  if (Send_Data_Flag) {
+    Send_Data();
+  }
 }
-
-
