@@ -62,6 +62,12 @@ STM32F103RCT6/STM32F105RCT6
 
 [AccelStepper: AccelStepper library for Arduino](https://www.airspayce.com/mikem/arduino/AccelStepper/)
 
+步进电机库此处新增一方法，此方法更新当前位置时不会更新目标位置导致电机停止。
+
+![image-20250325214349031](./assets/image-20250325214349031.png)
+
+![image-20250325214431259](./assets/image-20250325214431259.png)
+
 **AS5600**
 
 [RobTillaart/AS5600: Arduino library for AS5600 magnetic rotation meter](https://github.com/RobTillaart/AS5600)
