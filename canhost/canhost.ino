@@ -37,7 +37,7 @@ void Uart_Send() {
   for (int i = 0; i < 4; i++) {
     if (rxData_2[i].updated) {
       char buffer[20];
-      sprintf(buffer, "ID:%d %c %d %d %d", i + 111, rxData_2[i].data[0], (int16_t)(rxData_2[i].data[2] << 8 | rxData_2[i].data[1]), (int16_t)(rxData_2[i].data[4] << 8 | rxData_2[i].data[3]), (int16_t)(rxData_2[i].data[6] << 8 | rxData_2[i].data[5]));
+      sprintf(buffer, "ID %d %c %d %d %d", i + 111, rxData_2[i].data[0], (int16_t)(rxData_2[i].data[2] << 8 | rxData_2[i].data[1]), (int16_t)(rxData_2[i].data[4] << 8 | rxData_2[i].data[3]), (int16_t)(rxData_2[i].data[6] << 8 | rxData_2[i].data[5]));
       Serial.println(buffer);
       Serial.println();
       rxData_2[i].updated = false;  // 处理完成后清除标志
@@ -47,7 +47,7 @@ void Uart_Send() {
     if (i == 6 || i == 7) {
       if (rxData_2[i].updated) {
         char buffer[50];
-        sprintf(buffer, "ID:%d %c %PRIu64", i + 111, rxData_2[i].data[0], (uint64_t)(rxData_2[i].data[1] << 40) | (uint64_t)(rxData_2[i].data[2] << 32) | (uint64_t)(rxData_2[i].data[3] << 24) | (uint64_t)(rxData_2[i].data[4] << 16) | (uint64_t)(rxData_2[i].data[5] << 8) | (uint64_t)rxData_2[i].data[6]);
+        sprintf(buffer, "ID %d %c %d %d %d %d %d %d", i + 111, rxData_2[i].data[0], rxData_2[i].data[1], rxData_2[i].data[2], rxData_2[i].data[3], rxData_2[i].data[4], rxData_2[i].data[5], rxData_2[i].data[6]);
         Serial.println(buffer);
         Serial.println();
         rxData_2[i].updated = false;  // 处理完成后清除标志
@@ -55,7 +55,7 @@ void Uart_Send() {
     } else {
       if (rxData_2[i].updated) {
         char buffer[20];
-        sprintf(buffer, "ID:%d %c %d %d %d", i + 111, rxData_2[i].data[0], (int16_t)(rxData_2[i].data[2] << 8 | rxData_2[i].data[1]), (int16_t)(rxData_2[i].data[4] << 8 | rxData_2[i].data[3]), rxData_2[i].data[5]);
+        sprintf(buffer, "ID %d %c %d %d %d", i + 111, rxData_2[i].data[0], (int16_t)(rxData_2[i].data[2] << 8 | rxData_2[i].data[1]), (int16_t)(rxData_2[i].data[4] << 8 | rxData_2[i].data[3]), rxData_2[i].data[5]);
         Serial.println(buffer);
         Serial.println();
         rxData_2[i].updated = false;  // 处理完成后清除标志
@@ -119,17 +119,18 @@ void Set_ZPos(int txMsgID) {
   can.transmit(txMsgID, txData, txDataLen);
 }
 //MAC地址发送命令
-void Send_Mac(int txMsgID, uint64_t MAC) {
+uint8_t MAC[6]{};
+void Send_Mac(int txMsgID, uint8_t MAC_[6]) {
   uint8_t txData[7]{};
   int txDataLen = 7;
-  if (MAC != 0) {
-    txData[0] = 'M';                 //正常代码M
-    txData[6] = MAC & 0xFF;          // 获取最低字节
-    txData[5] = (MAC >> 8) & 0xFF;   // 获取9-16字节
-    txData[4] = (MAC >> 16) & 0xFF;  // 获取17-24字节
-    txData[3] = (MAC >> 24) & 0xFF;  // 获取25-32字节
-    txData[2] = (MAC >> 32) & 0xFF;  // 获取33-40字节
-    txData[1] = (MAC >> 40) & 0xFF;  // 获取41-48字节
+  if (MAC_[0] != 0 && MAC_[5] != 0) {
+    txData[0] = 'M';      //正常代码M
+    txData[1] = MAC_[0];  //MAC第一位
+    txData[2] = MAC_[1];  //MAC第二位
+    txData[3] = MAC_[2];  //MAC第三位
+    txData[4] = MAC_[3];  //MAC第四位
+    txData[5] = MAC_[4];  //MAC第五位
+    txData[6] = MAC_[5];  //MAC第六位
     can.transmit(txMsgID, txData, txDataLen);
   }
 }
@@ -141,11 +142,23 @@ void Uart_To_Can() {
     Serial.println("Received: " + command);         // 打印接收到的指令
 
     int id;
-    uint64_t value;
+    uint16_t value;
     char cmd;
-
+    //解析MAC指令
+    if (sscanf(command.c_str(), "ID %d M %d %d %d %d %d %d", &id, &MAC[0], &MAC[1], &MAC[2], &MAC[3], &MAC[4], &MAC[5]) == 7) {
+      Serial.print("Parsed ID: ");
+      Serial.println(id);
+      Serial.print("Parsed MAC: ");
+      for (int i = 0; i < 6; i++) {
+        Serial.print(MAC[i], HEX);
+        if (i < 5) Serial.print(":");
+      }
+      Serial.println();
+      Send_Mac(id, MAC);             //发送MAC地址
+      memset(&MAC, 0, sizeof(MAC));  //清空MAC缓存
+    }
     // 解析串口指令格式: "ID 111 S 1000"
-    if (sscanf(command.c_str(), "ID %d %c %PRIu64", &id, &cmd, &value) > 2) {
+    else if (sscanf(command.c_str(), "ID %d %c %d", &id, &cmd, &value) == 3) {
       Serial.print("Parsed ID: ");
       Serial.println(id);
       Serial.print("Parsed CMD: ");
@@ -153,13 +166,11 @@ void Uart_To_Can() {
       if (cmd == 'S') {
         Serial.print("Parsed Speed: ");
         Serial.println(value);
-        Run(id, (int16_t)value);  // 发送速度命令
+        Run(id, value);  // 发送速度命令
       } else if (cmd == 'A') {
         Serial.print("Parsed Angle: ");
         Serial.println(value);
-        Angle(id, (int16_t)value);  // 发送角度命令
-      } else if (cmd == 'M') {
-        Send_Mac(id, value);  //发送MAC地址
+        Angle(id, value);  // 发送角度命令
       } else {
         Serial.println("⚠ 未知指令");
       }

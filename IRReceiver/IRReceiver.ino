@@ -222,6 +222,8 @@ void docmd(String cmdl) {
     uint32_t color = 0;
     if (sscanf(cmdl.c_str() + 6, "%x", &color) == 1) {  // 跳过 "COLOR "
       Led_Back(color);
+    }else if(){
+
     } else {
       Serial1.println("Invalid COLOR format! Use: COLOR RRGGBB");
     }
