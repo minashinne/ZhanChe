@@ -12,7 +12,7 @@
 #define M0 PC7
 #define M1 PC8
 #define M2 PC9          //步进模式控制引脚
-#define Step_Angle 444  //步角比
+#define Step_Angle 62  //步角比200*8*14/360=62.2
 // 创建一个 AccelStepper 对象
 AccelStepper stepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
 

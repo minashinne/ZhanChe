@@ -12,7 +12,7 @@
 #define M0 PC7
 #define M1 PC8
 #define M2 PC9                       //步进模式控制引脚
-#define Step_Angle 444               //步角比为200*8*100/360=160000/360约=444步/度 需要根据电机减速比进行调整
+#define Step_Angle 62               //步角比为200*8*14/360=160000/360约=62步/度 需要根据电机减速比进行调整
 const int32_t Circle_Step = 160000;  //一圈步进值
 // 创建一个 AccelStepper 对象
 AccelStepper stepper(AccelStepper::DRIVER, STEP_PIN, DIR_PIN);
