@@ -55,7 +55,7 @@ String cmd;
 //LED播放动画线程
 unsigned long previousMillis = 0;
 int step = 0;            // 状态机步骤
-bool ledActive = false;  // 仅在收到 "Hit!" 时激活 LED
+bool ledActive = true;  // 仅在收到 "Hit!" 时激活 LED
 void ledTask(void *pvParameters) {
   while (1) {
     if (strcmp(myData.rxmessage, "Hit!") == 0) {
@@ -134,7 +134,7 @@ void IR() {
     myRawdata = IrReceiver.decodedIRData.decodedRawData;
     if (myRawdata != 0 && (myRawdata > 0x000000000000 && myRawdata < 0xFFFFFFFFFFFF)) {
       // 将 48 位整数拆分为 6 个字节，并填充到 peerAddress 数组中
-      uint8_t _peerAddress[] = {};
+      uint8_t _peerAddress[6]{};
       for (int i = 0; i < 6; i++) {
         _peerAddress[5 - i] = (myRawdata >> (8 * i)) & 0xFF;  // 提取每个字节
       }
@@ -266,6 +266,9 @@ void EspSend(struct_message _myData) {
 //初始化配置
 void setup() {
   // 初始化 WS2812 灯带
+  pinMode(LED_PIN_L, OUTPUT); 
+  pinMode(LED_PIN_R, OUTPUT);
+  pinMode(LED_PIN_B, OUTPUT); 
   strip_b.begin();
   strip_b.show();
   strip_r.begin();
@@ -309,17 +312,22 @@ void setup() {
   xTaskCreatePinnedToCore(
     ledTask,     // 任务函数
     "LED Task",  // 任务名称
-    1000,        // 栈大小
+    4096,        // 栈大小
     NULL,        // 任务参数
-    3,           // 任务优先级
+    1,           // 任务优先级
     NULL,        // 任务句柄
-    0            // 绑定 CPU 核心 0
+    1            // 绑定 CPU 核心 0
   );
 }
 
 
 //主任务
 void loop() {
+  Led_1(strip_l.Color(255, 255, 255));  // 第一圈亮白色
+  Serial.println("running");
+  delay(100);
+  Led_1(strip_l.Color(0, 0, 0));
+  delay(100);
   if (Serial1.available()) {
     cmd = Serial1.readStringUntil('\n');  // 读取串口命令
     docmd(cmd);                           // 解析并执行命令

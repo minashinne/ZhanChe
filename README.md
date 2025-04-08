@@ -50,6 +50,10 @@ STM32F103RCT6/STM32F105RCT6
 
 ### **3.2 库文件**
 
+ESP32arduino版本3.1.3 IDF版本5.4。（3.2版本中由于IDF版本更新到5.4 Adafruit_NeoPixel库函数show的实现似乎出现问题，实测LED控制不生效且无波形输出。）
+
+STM32duino 版本2.9
+
 **QuickPID**
 
 [Dlloydev/QuickPID: A fast PID controller with multiple options. Various Integral anti-windup, Proportional, Derivative and timer control modes.](https://github.com/Dlloydev/QuickPID)

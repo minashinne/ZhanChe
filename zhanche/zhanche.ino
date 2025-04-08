@@ -36,8 +36,8 @@ unsigned long lastTime = 0;  // 上次计算时间
 bool Recover_Flag = false;   //来自上位机的电机解锁命令标志
 bool Error_Flag = false;     //电机错误标志
 //CAN设置
-int txMsgID = 114;  //发送报文附带的ID
-int rxMsgID = 114;  //准许接收指定附带ID的报文（过滤器控制，未进入loop模式，不会接收自己的报文）
+int txMsgID = 111;  //发送报文附带的ID
+int rxMsgID = 111;  //准许接收指定附带ID的报文（过滤器控制，未进入loop模式，不会接收自己的报文）
 int Time_Conut = 0;
 
 uint8_t txData[8]{};  //整数转化后的数组容器,第0位为状态代码，第1,2位为目标速度，第3,4位为当前速度，第5,6位为输出PWM。
@@ -211,7 +211,13 @@ void loop() {
     // Serial.print(Target_Speed);
     // Serial.println(" RPM");
     ////每秒上报一次状态
-    if (Time_Conut >= 10) {
+    if (Time_Conut >= 30) {
+      //2025.4.7电机往复测试修改时间计数为30，增加速度往复
+      if (Target_Speed == 1000) {
+        Target_Speed = -1000;
+      } else {
+        Target_Speed = 1000;
+      }
       Time_Conut = 0;
       SendData_1000ms();
       // Serial.println("OK");
